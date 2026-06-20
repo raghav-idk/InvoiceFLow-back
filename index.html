@@ -501,7 +501,59 @@
  
 <script>
 "use strict";
+async function sendChat() {
+    const textInput = document.getElementById("textInput");
+    const systemPromptInput = document.getElementById("systemPromptInput");
+    const chatContainer = document.getElementById("chatContainer");
 
+    const text = textInput.value.trim();
+    const systemPrompt = systemPromptInput.value.trim();
+
+    if (!text) return;
+
+    // Clear user input field immediately
+    textInput.value = "";
+
+    // 1. Append User Message to UI
+    appendMessage(text, "user");
+
+    // 2. Create and Append AI Bubble (Loading State)
+    const aiMessageDiv = appendMessage("Thinking...", "ai");
+
+    let success = false;
+    let reply = "Something went wrong. Please check your setup.";
+
+    try {
+        // 3. Securely Fetch from your Vercel Serverless Backend
+        const response = await fetch(`/api/chat`, {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json" 
+            },
+            body: JSON.stringify({
+                text: text,
+                systemPrompt: systemPrompt
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            reply = result.reply;
+            success = true;
+        } else {
+            // Capture specific backend errors (e.g., missing API key)
+            reply = `Error: ${result.error || "Backend failed to process response."}`;
+        }
+
+    } catch (error) {
+        console.error("Network Error:", error);
+        reply = "Network error. Make sure your Vercel backend is running.";
+    }
+
+    // 4. Update the AI Bubble with the Actual Response
+    updateMessage(aiMessageDiv, reply, success);
+}
 /* ============================================================ *
  * InvoiceFlow — PINT-AE invoice workspace                     *
  * ============================================================ */
