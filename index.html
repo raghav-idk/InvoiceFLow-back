@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InvoiceFlow — PINT-AE Invoice Workspace</title>
+<style>
+  :root{
+    --bg:#F7F8FA; --panel:#FFFFFF; --ink:#0F172A; --muted:#64748B; --muted-2:#94A3B8;
+    --line:#E2E8F0; --line-soft:#EEF1F5;
+    --primary:#1E3A5F; --primary-2:#27496E;
+    --action:#2563EB; --action-soft:#EFF4FE; --action-line:#CFE0FB;
+    --pass:#15803D; --pass-soft:#ECF7F0;
+    --fail:#B91C1C; --fail-soft:#FBECEC;
+    --warn:#B45309; --warn-soft:#FBF3E6;
+    --chip:#F1F4F8;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --radius:10px; --radius-sm:7px;
+    --shadow:0 1px 2px rgba(15,23,42,.04),0 6px 18px rgba(15,23,42,.05);
+    --shadow-lg:0 4px 12px rgba(15,23,42,.08),0 16px 40px rgba(15,23,42,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  .mono{font-family:var(--mono)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cbd3df;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+ 
+  /* ---------- top bar ---------- */
+  .topbar{height:56px;display:flex;align-items:center;gap:14px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{width:32px;height:32px;border-radius:8px;background:var(--primary);display:grid;place-items:center;flex:0 0 auto}
+  .brand h1{font-size:15.5px;margin:0;font-weight:700;letter-spacing:-.2px}
+  .brand .sub{font-size:11px;color:var(--muted);margin-top:1px;letter-spacing:.2px}
+  .topbar .spacer{flex:1}
+  .pill{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--chip);border:1px solid var(--line);padding:4px 10px;border-radius:6px;white-space:nowrap}
+  .pill b{color:var(--primary);font-weight:600}
+  .icon-btn{display:none;border:1px solid var(--line);background:var(--panel);border-radius:8px;width:36px;height:36px;color:var(--ink);align-items:center;justify-content:center}
+  .icon-btn svg{width:18px;height:18px}
+ 
+  /* ---------- layout ---------- */
+  .app{display:grid;grid-template-columns:276px 1fr 360px;height:calc(100vh - 56px)}
+  .col{height:100%;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+  .col.sources{border-right:1px solid var(--line);background:var(--panel)}
+  .col.canvas{background:var(--bg)}
+  .col.agent{border-left:1px solid var(--line);background:var(--panel)}
+  .col-head{padding:13px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto}
+  .col-head .ttl{font-size:11.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+  .col-body{overflow:auto;padding:16px;flex:1 1 auto}
+ 
+  /* ---------- sources ---------- */
+  .add-btn{border:1px solid var(--action-line);background:var(--action-soft);border-radius:7px;font-size:12px;padding:6px 11px;color:var(--action);font-weight:600}
+  .add-btn:hover{background:#e3edfd}
+  .dropzone{border:1.5px dashed #c6cfdc;border-radius:var(--radius);padding:20px 14px;text-align:center;color:var(--muted);font-size:12.5px;background:#fbfcfd;transition:.15s}
+  .dropzone.drag{border-color:var(--action);background:var(--action-soft);color:var(--action)}
+  .dropzone b{color:var(--ink);font-weight:600}
+  .dz-actions{display:flex;gap:14px;margin-top:13px;justify-content:center;flex-wrap:wrap}
+  .ghost{font-size:11.5px;color:var(--action);background:none;border:none;padding:2px;font-weight:600}
+  .ghost:hover{text-decoration:underline}
+  .src-list{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+  .src{border:1px solid var(--line);border-radius:var(--radius-sm);padding:11px 12px;background:var(--panel);cursor:pointer;transition:.12s;position:relative}
+  .src:hover{border-color:#cbd5e3;box-shadow:var(--shadow)}
+  .src.active{border-color:var(--action);box-shadow:0 0 0 1px var(--action)}
+  .src .nm{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;word-break:break-all;padding-right:16px}
+  .src .meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .tag{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;background:var(--chip);color:var(--muted);border:1px solid var(--line-soft)}
+  .tag.s{background:var(--pass-soft);color:var(--pass);border-color:transparent}
+  .tag.cat{background:#EAF0F8;color:var(--primary);border-color:transparent}
+  .tag.fail{background:var(--fail-soft);color:var(--fail);border-color:transparent}
+  .tag.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+  .src .del{position:absolute;top:9px;right:9px;border:none;background:none;color:#b4bccb;font-size:13px;line-height:1;padding:2px;opacity:0;transition:.1s}
+  .src:hover .del{opacity:1}
+  .src .del:hover{color:var(--fail)}
+ 
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:0;flex:0 0 auto;border-bottom:1px solid var(--line);background:var(--panel);padding:0 12px}
+  .tab{border:none;background:none;padding:14px 15px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+  .tab .count{font-family:var(--mono);font-size:10px;background:var(--chip);padding:1px 6px;border-radius:9px;margin-left:6px;color:var(--muted)}
+  .tab.active .count{background:var(--action-soft);color:var(--action)}
+ 
+  /* ---------- canvas ---------- */
+  .empty{display:grid;place-items:center;height:100%;text-align:center;color:var(--muted);padding:30px}
+  .empty .ill{width:46px;height:46px;color:#c2cbd9;margin-bottom:10px}
+  .empty h3{margin:4px 0 5px;color:var(--ink);font-weight:650;font-size:16px}
+  .empty p{max-width:340px;font-size:13px;margin:0 auto}
+ 
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .card h4{margin:0 0 13px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);font-weight:700}
+ 
+  .doc-id{font-family:var(--mono);font-size:19px;font-weight:600;letter-spacing:-.2px}
+  .doc-row{display:flex;flex-wrap:wrap;gap:18px 28px;margin-top:13px}
+  .field{display:flex;flex-direction:column;gap:3px}
+  .field .lbl{font-size:10.5px;color:var(--muted);letter-spacing:.3px;display:flex;align-items:center;gap:5px}
+  .field .val{font-size:14px;font-weight:550}
+  .bt{font-family:var(--mono);font-size:9.5px;color:#8a93a4;background:var(--chip);padding:1px 5px;border-radius:4px;border:1px solid var(--line-soft)}
+ 
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .party{border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 14px;background:#fbfcfd}
+  .party .role{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+  .party .pn{font-size:14px;font-weight:600;margin-top:4px}
+  .party .trn{font-family:var(--mono);font-size:12px;margin-top:8px;color:var(--ink)}
+  .party .trn.missing{color:var(--fail)}
+ 
+  table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.grid th{text-align:left;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:1px solid var(--line)}
+  table.grid td{padding:8px}
+  table.grid tbody tr{border-bottom:1px solid var(--line-soft)}
+  table.grid tbody tr:last-child{border-bottom:none}
+  table.grid td.num,table.grid th.num{text-align:right;font-family:var(--mono)}
+  .catcode{font-family:var(--mono);font-weight:600}
+  .catcode.S{color:var(--primary)} .catcode.Z{color:var(--pass)} .catcode.E{color:var(--warn)}
+  .catcode.AE{color:#6D28D9} .catcode.O{color:var(--muted)}
+ 
+  .totals{display:flex;flex-wrap:wrap;gap:10px}
+  .tot{flex:1 1 120px;border:1px solid var(--line);border-radius:var(--radius-sm);padding:11px 13px;background:#fbfcfd}
+  .tot .k{font-size:10.5px;color:var(--muted);display:flex;gap:5px;align-items:center}
+  .tot .v{font-family:var(--mono);font-size:16px;font-weight:600;margin-top:5px}
+  .tot.payable{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .tot.payable .k{color:#bcc9da} .tot.payable .v{color:#fff}
+ 
+  .terms{display:flex;flex-wrap:wrap;gap:6px}
+  .term{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:7px;padding:4px 9px 4px 4px;font-size:12px;background:#fbfcfd}
+  .term .tc{font-family:var(--mono);font-size:9.5px;color:#fff;background:#94A3B8;padding:2px 5px;border-radius:4px}
+ 
+  /* ---------- validation ---------- */
+  .verdict{display:flex;align-items:center;gap:14px;padding:15px 17px;border-radius:var(--radius);border:1px solid var(--line);margin-bottom:14px;background:var(--panel);box-shadow:var(--shadow)}
+  .verdict .dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
+  .verdict.pass .dot{background:var(--pass)} .verdict.warn .dot{background:var(--warn)} .verdict.fail .dot{background:var(--fail)}
+  .verdict .vt{font-weight:700;font-size:15px}
+  .verdict.pass .vt{color:var(--pass)} .verdict.warn .vt{color:var(--warn)} .verdict.fail .vt{color:var(--fail)}
+  .verdict .vs{font-size:12.5px;color:var(--muted);margin-top:1px}
+  .counts{margin-left:auto;display:flex;gap:7px;font-family:var(--mono);font-size:11.5px}
+  .counts span{padding:4px 9px;border-radius:6px}
+  .counts .f{background:var(--fail-soft);color:var(--fail)}
+  .counts .w{background:var(--warn-soft);color:var(--warn)}
+  .counts .o{background:var(--pass-soft);color:var(--pass)}
+  .finding{border:1px solid var(--line);border-left-width:3px;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:9px;background:var(--panel)}
+  .finding.fatal{border-left-color:var(--fail)} .finding.warning{border-left-color:var(--warn)} .finding.info{border-left-color:var(--action)}
+  .finding .fh{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .sev{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;padding:2px 6px;border-radius:4px;font-weight:600}
+  .sev.fatal{background:var(--fail-soft);color:var(--fail)} .sev.warning{background:var(--warn-soft);color:var(--warn)} .sev.info{background:var(--action-soft);color:var(--action)}
+  .rid{font-family:var(--mono);font-size:11.5px;color:var(--primary);font-weight:600}
+  .finding .msg{font-size:13px;font-weight:550;margin-top:8px}
+  .finding .ex{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .finding .fix{font-size:12.5px;margin-top:7px;padding:8px 10px;background:var(--action-soft);border-radius:6px;color:#1d4ed8}
+  .finding .fix b{font-weight:650}
+  .legend{font-size:11.5px;color:var(--muted);padding:11px 13px;border:1px solid var(--line);border-radius:var(--radius-sm);background:#fbfcfd;margin-top:6px}
+  .legend b{color:var(--ink)}
+ 
+  /* ---------- test lab ---------- */
+  .lab-intro{font-size:12.5px;color:var(--muted);margin-bottom:15px}
+  .scn{border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 15px;margin-bottom:10px;background:var(--panel)}
+  .scn .sh{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .kind{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;padding:2px 7px;border-radius:9px;font-weight:600}
+  .kind.negative{background:var(--fail-soft);color:var(--fail)} .kind.positive{background:var(--pass-soft);color:var(--pass)}
+  .scn .st{font-size:13.5px;font-weight:600}
+  .scn .se{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .scn .expect{font-size:12px;margin-top:8px}
+  .scn-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:var(--panel);border-radius:7px;font-size:12px;padding:6px 12px;font-weight:600;color:var(--ink);transition:.12s;display:inline-flex;align-items:center;gap:6px}
+  .btn:hover{border-color:#cbd5e3;background:#f8fafc}
+  .btn.primary{background:var(--action);border-color:var(--action);color:#fff}
+  .btn.primary:hover{background:#1d4ed8}
+  .btn svg{width:14px;height:14px}
+  .runres{margin-top:10px;font-size:12px;padding:9px 11px;border-radius:6px;display:none}
+  .runres.ok{display:block;background:var(--pass-soft);color:var(--pass)}
+  .runres.miss{display:block;background:var(--warn-soft);color:var(--warn)}
+ 
+  /* ---------- INVOICE VIEW (printable) ---------- */
+  .view-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+  .view-bar .vh{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .inv-doc{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:44px 46px;max-width:820px;margin:0 auto;color:#1b2433}
+  .inv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;flex-wrap:wrap}
+  .inv-seller .sname{font-size:18px;font-weight:700;letter-spacing:-.2px}
+  .inv-seller .sline{font-size:12.5px;color:#5b6678;margin-top:5px}
+  .inv-seller .strn{font-family:var(--mono);font-size:12px;color:#1b2433;margin-top:8px}
+  .inv-titleblock{text-align:right}
+  .inv-title{font-size:24px;font-weight:800;letter-spacing:.5px;color:var(--primary)}
+  .inv-metatbl{margin-top:12px;font-size:12.5px;border-collapse:collapse;margin-left:auto}
+  .inv-metatbl td{padding:3px 0 3px 18px;text-align:right;white-space:nowrap}
+  .inv-metatbl td.k{color:#6b7686;text-align:right;font-weight:500}
+  .inv-metatbl td.v{font-family:var(--mono);font-weight:600;color:#1b2433}
+  .inv-rule{height:1px;background:#e7eaf0;margin:26px 0}
+  .inv-billto{display:flex;gap:54px;flex-wrap:wrap}
+  .inv-billto .bt-lbl{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:#8a93a4;font-weight:700}
+  .inv-billto .bt-name{font-size:14px;font-weight:600;margin-top:5px}
+  .inv-billto .bt-line{font-size:12.5px;color:#5b6678;margin-top:3px}
+  .inv-billto .bt-trn{font-family:var(--mono);font-size:11.5px;margin-top:5px}
+  table.inv-lines{width:100%;border-collapse:collapse;margin-top:24px;font-size:12.5px}
+  table.inv-lines thead th{background:var(--primary);color:#fff;font-weight:600;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;padding:9px 11px;text-align:left}
+  table.inv-lines thead th.num{text-align:right}
+  table.inv-lines tbody td{padding:10px 11px;border-bottom:1px solid #edf0f4;vertical-align:top}
+  table.inv-lines tbody td.num{text-align:right;font-family:var(--mono)}
+  table.inv-lines tbody td .desc-sub{color:#8a93a4;font-size:11px;margin-top:2px}
+  .inv-summary{display:flex;justify-content:space-between;gap:30px;margin-top:22px;flex-wrap:wrap}
+  .inv-notes{flex:1 1 240px;font-size:12px;color:#5b6678}
+  .inv-notes .nt-lbl{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:#8a93a4;font-weight:700;margin-bottom:6px}
+  .inv-totbox{flex:0 0 300px;max-width:320px}
+  .inv-totbox .trow{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:1px solid #edf0f4}
+  .inv-totbox .trow .tk{color:#5b6678} .inv-totbox .trow .tv{font-family:var(--mono);font-weight:600}
+  .inv-totbox .trow.sub .tk{color:#8a93a4;font-size:12px} .inv-totbox .trow.sub .tv{font-size:12px;color:#5b6678;font-weight:500}
+  .inv-totbox .grand{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px;padding:14px 16px;background:var(--primary);color:#fff;border-radius:8px}
+  .inv-totbox .grand .gk{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:#bcc9da}
+  .inv-totbox .grand .gv{font-family:var(--mono);font-size:20px;font-weight:700}
+  .inv-foot{margin-top:34px;padding-top:16px;border-top:1px solid #e7eaf0;font-size:11px;color:#8a93a4;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+ 
+  /* ---------- agent ---------- */
+  .agent .col-head .ttl{display:flex;align-items:center;gap:9px}
+  .mode{font-size:9.5px;padding:3px 8px 3px 7px;border-radius:11px;background:var(--chip);color:var(--muted);text-transform:none;letter-spacing:.2px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+  .mode .md{width:6px;height:6px;border-radius:50%;background:#b4bccb}
+  .mode.live{background:var(--pass-soft);color:var(--pass)} .mode.live .md{background:var(--pass)}
+  .chat{flex:1 1 auto;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:13px}
+  .msg{max-width:92%;font-size:13px;line-height:1.55}
+  .msg.user{align-self:flex-end;background:var(--primary);color:#fff;padding:9px 13px;border-radius:12px 12px 4px 12px}
+  .msg.bot{align-self:flex-start}
+  .msg.bot .bubble{background:#fff;border:1px solid var(--line);padding:12px 14px;border-radius:12px 12px 12px 4px;box-shadow:var(--shadow)}
+  .msg.bot .bubble p{margin:0 0 8px} .msg.bot .bubble p:last-child{margin:0}
+  .msg.bot .bubble code{font-family:var(--mono);font-size:12px;background:var(--chip);padding:1px 5px;border-radius:4px}
+  .msg.bot .bubble ul{margin:6px 0;padding-left:18px} .msg.bot .bubble li{margin:3px 0}
+  .msg.bot .bubble h5{margin:2px 0 7px;font-size:12.5px}
+  .typing{display:inline-flex;gap:4px;padding:4px 2px}
+  .typing i{width:6px;height:6px;border-radius:50%;background:#c2cbd9;animation:bb 1.2s infinite}
+  .typing i:nth-child(2){animation-delay:.2s} .typing i:nth-child(3){animation-delay:.4s}
+  @keyframes bb{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+  .chat-card{border:1px solid var(--line);border-radius:8px;background:#fbfcfd;padding:11px 12px;margin-top:8px}
+  .chat-card .cct{font-size:12px;font-weight:650;display:flex;gap:7px;align-items:center}
+  .chat-card .ccb{font-size:12px;color:var(--muted);margin-top:4px}
+  .chat-card .row{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--line-soft)}
+  .chat-card .row:last-child{border:none}
+  .chat-card .row .mono{font-size:11px}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;padding:10px 16px 4px;flex:0 0 auto}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:7px;font-size:11.5px;padding:6px 11px;color:var(--primary);font-weight:550}
+  .chip:hover{background:var(--action-soft);border-color:var(--action-line)}
+  .composer{flex:0 0 auto;padding:13px 16px;border-top:1px solid var(--line);display:flex;gap:9px;align-items:flex-end}
+  .composer textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-family:inherit;font-size:13px;max-height:120px;line-height:1.4;color:var(--ink);background:var(--panel)}
+  .composer textarea:focus{outline:none;border-color:var(--action);box-shadow:0 0 0 3px var(--action-soft)}
+  .send{flex:0 0 auto;width:38px;height:38px;border-radius:9px;border:none;background:var(--action);color:#fff;display:grid;place-items:center}
+  .send svg{width:18px;height:18px}
+  .send:hover{background:#1d4ed8} .send:disabled{background:#aebbd2;cursor:default}
+  .hint{font-size:11px;color:var(--muted);text-align:center;padding:0 16px 11px}
+ 
+  /* ---------- responsive ---------- */
+  @media (max-width:1080px){
+    .app{grid-template-columns:1fr}
+    .col.sources,.col.agent{position:fixed;top:56px;bottom:0;width:320px;z-index:20;transform:translateX(0);transition:transform .2s;box-shadow:var(--shadow-lg)}
+    .col.sources{left:0} .col.agent{right:0}
+    .col.sources.hide{transform:translateX(-100%)} .col.agent.hide{transform:translateX(100%)}
+    .icon-btn{display:flex}
+    .pill.hide-sm{display:none}
+    .inv-doc{padding:28px 24px}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+ 
+  /* ---------- print: invoice only ---------- */
+  @media print{
+    body{background:#fff}
+    .topbar,.col.sources,.col.agent,.tabs,.view-bar{display:none!important}
+    .app{display:block;height:auto}
+    .col.canvas{overflow:visible}
+    .col-body{overflow:visible;padding:0}
+    .inv-doc{box-shadow:none;border:none;max-width:100%;margin:0;padding:0}
+    table.inv-lines thead th,.inv-totbox .grand{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <button class="icon-btn" id="tglSources" title="Sources" aria-label="Toggle sources">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h11"/><path d="M5 12h8"/><path d="M5 17h11"/><path d="M16 9l3 3-3 3"/></svg>
+      </span>
+      <div>
+        <h1>InvoiceFlow</h1>
+        <div class="sub">PINT-AE invoice workspace</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill hide-sm" id="globalStat">No invoices loaded</div>
+    <button class="icon-btn" id="tglAgent" title="Assistant" aria-label="Toggle assistant">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+  </div>
+ 
+  <div class="app">
+    <!-- SOURCES -->
+    <aside class="col sources" id="colSources">
+      <div class="col-head"><span class="ttl">Invoices</span><button class="add-btn" id="addBtn">Add XML</button></div>
+      <div class="col-body">
+        <div class="dropzone" id="dropzone">
+          <div>Drop <b>PINT-AE invoice XML</b> here</div>
+          <div class="dz-actions">
+            <button class="ghost" id="browseBtn">Browse files</button>
+            <button class="ghost" id="sampleBtn">Load sample</button>
+            <button class="ghost" id="sampleBadBtn">Load non-compliant sample</button>
+          </div>
+        </div>
+        <input type="file" id="fileInput" accept=".xml,text/xml,application/xml" multiple hidden />
+        <div class="src-list" id="srcList"></div>
+      </div>
+    </aside>
+ 
+    <!-- CANVAS -->
+    <main class="col canvas">
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="view">View</button>
+        <button class="tab" data-tab="details">Details</button>
+        <button class="tab" data-tab="validation">Validation <span class="count" id="cntVal">0</span></button>
+        <button class="tab" data-tab="lab">Test Lab <span class="count" id="cntLab">0</span></button>
+      </div>
+      <div class="col-body" id="canvasBody"></div>
+    </main>
+ 
+    <!-- ASSISTANT -->
+    <aside class="col agent" id="colAgent">
+      <div class="col-head"><span class="ttl">Assistant <span class="mode" id="agentMode"><span class="md"></span>connecting</span></span></div>
+      <div class="chat" id="chat"></div>
+      <div class="chips" id="chips"></div>
+      <div class="composer">
+        <textarea id="chatInput" rows="1" placeholder="Ask about this invoice, a validation rule, or a concept"></textarea>
+        <button class="send" id="sendBtn" title="Send" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </div>
+      <div class="hint">Answers are grounded in your loaded invoices.</div>
+    </aside>
+  </div>
+ 
+<script>
+"use strict";
+/* ============================================================ *
+ *  InvoiceFlow — PINT-AE invoice workspace (client-side core)  *
+ *  Backend (optional): POST /api/chat -> { reply }             *
+ * ============================================================ */
+ 
+const KB={
+  taxCategories:{
+    S:{name:"Standard rated",rate:"5%",note:"Standard UAE VAT. A 5% rate must be present on the line and subtotal."},
+    Z:{name:"Zero rated",rate:"0%",note:"Taxable at 0% (e.g. exports). Reportable, but no VAT charged."},
+    E:{name:"Exempt",rate:"—",note:"Outside VAT (e.g. certain financial services). No VAT and no input recovery."},
+    AE:{name:"Reverse charge",rate:"0% charged",note:"Buyer self-accounts for VAT (common in cross-border B2B). Seller charges no VAT; an exemption reason is expected."},
+    O:{name:"Out of scope",rate:"—",note:"Not a VAT supply."},
+    G:{name:"Free export",rate:"0%",note:"Export of goods."}
+  },
+  docTypes:{"380":"Commercial Invoice","388":"Tax Invoice","381":"Credit Note","383":"Debit Note","389":"Self-billed Invoice","261":"Self-billed Credit Note","386":"Prepayment Invoice"},
+  concepts:{
+    asp:"An ASP (Accredited Service Provider) is a Ministry of Finance–certified Peppol access point. UAE businesses route invoices through an ASP, which validates, transmits over Peppol, and reports the tax data to the FTA.",
+    peppol:"Peppol is a network for exchanging business documents: any system connected via an access point can exchange invoices with any other, without point-to-point links.",
+    "5-corner":"The UAE model: seller (C1) → seller's ASP (C2) → buyer's ASP (C3) → buyer (C4), with the FTA as the fifth corner receiving tax data.",
+    schematron:"A schematron is an executable rulebook. Each rule (for example ibr-sr-30) is an assertion the invoice must satisfy; if it fails, the rule fires and the invoice is rejected. InvoiceFlow's built-in checks are heuristic stand-ins, not the certified schematron.",
+    trn:"TRN is the Tax Registration Number, the 15-digit UAE VAT identifier for a registered business.",
+    pint:"PINT-AE is the UAE localisation of the Peppol International invoice — the structured XML format for compliant e-invoices, built on UBL."
+  }
+};
+const TERM_LABELS={"BT-1":"Invoice number","BT-2":"Issue date","BT-3":"Invoice type code","BT-5":"Currency","BT-9":"Due date","BT-27":"Seller name","BT-31":"Seller TRN","BT-44":"Buyer name","BT-48":"Buyer TRN","BT-106":"Sum of line amounts","BT-109":"Tax exclusive total","BT-110":"Total VAT","BT-112":"Tax inclusive total","BT-115":"Amount payable","BT-118":"VAT category code","BT-119":"VAT rate"};
+ 
+const state={sources:[],activeId:null,tab:"view",busy:false,history:[],apiLive:null};
+let idSeq=1;
+ 
+/* ---- XML helpers (namespace-agnostic) ---- */
+function ln(n){return n.localName||(n.nodeName||"").replace(/^.*:/,"");}
+function child(p,name){if(!p)return null;for(const c of p.children){if(ln(c)===name)return c;}return null;}
+function children(p,name){const o=[];if(!p)return o;for(const c of p.children){if(ln(c)===name)o.push(c);}return o;}
+function deep(p,path){let c=p;for(const x of path){c=child(c,x);if(!c)return null;}return c;}
+function txt(n){return n?(n.textContent||"").trim():"";}
+function findFirst(root,name){const s=[root];while(s.length){const n=s.shift();if(n!==root&&ln(n)===name)return n;for(const c of(n.children||[]))s.push(c);}return null;}
+function findAll(root,name){const o=[];const s=[root];while(s.length){const n=s.pop();if(n!==root&&ln(n)===name)o.push(n);for(const c of(n.children||[]))s.push(c);}return o.reverse();}
+ 
+/* ---- parse ---- */
+function parsePintAe(xml){
+  const res={ok:false,error:null,raw:xml};let doc;
+  try{doc=new DOMParser().parseFromString(xml,"application/xml");}catch(e){res.error="Could not parse the file as XML.";return res;}
+  if(doc.getElementsByTagName("parsererror").length){res.error="The document is not well-formed XML.";return res;}
+  const root=doc.documentElement;if(!root){res.error="The document is empty.";return res;}
+  const rn=ln(root);
+  if(!/^(Invoice|CreditNote)$/.test(rn)){res.error="Root element is <"+rn+">. A UBL <Invoice> or <CreditNote> is expected.";return res;}
+  res.ok=true;res.root=rn;
+  res.customization=txt(child(root,"CustomizationID"));res.profile=txt(child(root,"ProfileID"));
+  res.id=txt(child(root,"ID"));res.issueDate=txt(child(root,"IssueDate"));res.dueDate=txt(child(root,"DueDate"));
+  res.typeCode=txt(child(root,"InvoiceTypeCode"))||txt(child(root,"CreditNoteTypeCode"));
+  res.typeName=KB.docTypes[res.typeCode]||(rn==="CreditNote"?"Credit Note":"Invoice");
+  res.currency=txt(child(root,"DocumentCurrencyCode"));
+  res.note=txt(child(root,"Note"));
+  function party(w){const wrap=child(root,w);const p=child(wrap,"Party");if(!p)return{name:"",trn:"",country:"",addr:""};
+    const name=txt(deep(p,["PartyLegalEntity","RegistrationName"]))||txt(deep(p,["PartyName","Name"]));
+    let trn="";for(const pts of children(p,"PartyTaxScheme")){const id=txt(child(pts,"CompanyID"));if(id){trn=id;break;}}
+    if(!trn)trn=txt(deep(p,["PartyLegalEntity","CompanyID"]));
+    const pa=deep(p,["PostalAddress"]);
+    const addr=pa?[txt(child(pa,"StreetName")),txt(child(pa,"CityName")),txt(deep(pa,["Country","IdentificationCode"]))].filter(Boolean).join(", "):"";
+    const country=txt(deep(p,["PostalAddress","Country","IdentificationCode"]));
+    return{name,trn,country,addr};}
+  res.seller=party("AccountingSupplierParty");res.buyer=party("AccountingCustomerParty");
+  res.taxCategories=[];const tt=child(root,"TaxTotal");res.taxTotal=num(txt(child(tt,"TaxAmount")));
+  for(const st of findAll(root,"TaxSubtotal")){const cat=child(st,"TaxCategory");
+    res.taxCategories.push({id:txt(child(cat,"ID"))||"?",percent:txt(child(cat,"Percent")),taxable:num(txt(child(st,"TaxableAmount"))),tax:num(txt(child(st,"TaxAmount")))});}
+  res.allowances=[];for(const ac of children(root,"AllowanceCharge")){
+    res.allowances.push({charge:txt(child(ac,"ChargeIndicator"))==="true",reasons:children(ac,"AllowanceChargeReason").map(txt),amount:num(txt(child(ac,"Amount")))});}
+  const lmt=child(root,"LegalMonetaryTotal");
+  res.totals={lineExt:num(txt(child(lmt,"LineExtensionAmount"))),taxExcl:num(txt(child(lmt,"TaxExclusiveAmount"))),taxIncl:num(txt(child(lmt,"TaxInclusiveAmount"))),payable:num(txt(child(lmt,"PayableAmount"))),allowance:num(txt(child(lmt,"AllowanceTotalAmount"))),charge:num(txt(child(lmt,"ChargeTotalAmount")))};
+  res.lines=[];const lname=rn==="CreditNote"?"CreditNoteLine":"InvoiceLine";
+  for(const l of children(root,lname)){const item=child(l,"Item");
+    res.lines.push({id:txt(child(l,"ID")),name:txt(child(item,"Name"))||txt(child(item,"Description")),desc:txt(child(item,"Description")),
+      qty:txt(child(l,"InvoicedQuantity"))||txt(child(l,"CreditedQuantity")),unit:(child(l,"InvoicedQuantity")||child(l,"CreditedQuantity")||{}).getAttribute?((child(l,"InvoicedQuantity")||child(l,"CreditedQuantity")).getAttribute("unitCode")||""):"",
+      amount:num(txt(child(l,"LineExtensionAmount"))),price:num(txt(deep(l,["Price","PriceAmount"]))),
+      vatCat:txt(deep(item,["ClassifiedTaxCategory","ID"])),vatPct:txt(deep(item,["ClassifiedTaxCategory","Percent"]))});}
+  res.terms=[["BT-1",res.id],["BT-2",res.issueDate],["BT-3",res.typeCode],["BT-5",res.currency],["BT-27",res.seller.name],["BT-31",res.seller.trn],["BT-44",res.buyer.name],["BT-48",res.buyer.trn],["BT-106",fmt(res.totals.lineExt)],["BT-110",fmt(res.taxTotal)],["BT-112",fmt(res.totals.taxIncl)],["BT-115",fmt(res.totals.payable)]].filter(t=>t[1]!==""&&t[1]!=null);
+  return res;
+}
+function num(s){if(s===""||s==null)return null;const n=parseFloat(s);return isNaN(n)?null:n;}
+function fmt(n){if(n==null)return"—";return n.toLocaleString("en-AE",{minimumFractionDigits:2,maximumFractionDigits:2});}
+ 
+/* ---- validation (heuristic) ---- */
+function validate(a){
+  const f=[];const add=(id,sev,term,msg,ex,fix)=>f.push({id,sev,term,msg,ex,fix});
+  const cats=a.taxCategories.map(c=>c.id);const hasStd=cats.includes("S");
+  if(!a.id)add("AE-ID-01","fatal","BT-1","Invoice number is missing.","Every invoice needs a unique identifier so it can be referenced, paid, and audited.","Populate <code>cbc:ID</code> at the document root.");
+  if(!a.issueDate)add("AE-DATE-01","fatal","BT-2","Issue date is missing.","The issue date anchors the tax point and reporting period.","Add <code>cbc:IssueDate</code> (YYYY-MM-DD).");
+  else if(isFuture(a.issueDate))add("AE-DATE-02","warning","BT-2","Issue date is in the future.","Future-dated invoices are usually a data-entry error and may be rejected on reporting.","Confirm the actual supply date.");
+  if(!a.typeCode)add("AE-TYPE-01","fatal","BT-3","Invoice type code is missing.","The type code identifies whether this is a tax invoice, credit note, self-billed document, and so on.","Add <code>cbc:InvoiceTypeCode</code> (for example 388).");
+  if(!a.currency)add("AE-CUR-01","fatal","BT-5","Document currency is missing.","Amounts cannot be interpreted without a currency.","Add <code>cbc:DocumentCurrencyCode</code> (for example AED).");
+  else if(!/^[A-Z]{3}$/.test(a.currency))add("AE-CUR-02","warning","BT-5","Currency code is not a valid ISO code.","Currency must be a three-letter ISO 4217 code.","Use a valid code such as AED, USD, or EUR.");
+  if(hasStd&&!a.seller.trn)add("AE-TRN-S-01","fatal","BT-31","Seller TRN is missing on a standard-rated invoice.","A VAT-registered seller charging 5% must declare its 15-digit TRN.","Add the seller TRN under <code>PartyTaxScheme/CompanyID</code>.");
+  if(!a.buyer.trn)add("AE-TRN-B-01","warning","BT-48","Buyer TRN is missing.","For B2B supplies the buyer TRN is normally required; without it the supply may be treated as B2C.","Capture the buyer TRN during onboarding or order entry.");
+  a.taxCategories.forEach(c=>{
+    if(c.id==="S"&&(c.percent===""||c.percent==null))add("AE-VAT-RATE-01","fatal","BT-119","Standard-rated subtotal has no VAT rate.","A category S line must carry a rate of 5%.","Set <code>cac:TaxCategory/cbc:Percent</code> to 5 on the standard-rated subtotal.");
+    if(c.id==="AE"&&c.tax&&c.tax>0)add("AE-RC-01","warning","BT-118","Reverse-charge (AE) subtotal carries a VAT amount.","Under reverse charge the seller charges no VAT; the buyer self-accounts.","Set the AE subtotal VAT amount to 0 and include an exemption reason.");
+  });
+  if(a.taxTotal!=null&&a.taxCategories.length===0)add("AE-VAT-SUB-01","fatal","BT-110","A tax total is present but there are no tax subtotals.","Each VAT total must be broken down by category.","Add at least one <code>cac:TaxSubtotal</code> describing the category and amount.");
+  a.allowances.forEach(al=>{if(al.reasons.length>1)add("AE-ALLOW-DUP-01","fatal","BT-097","An allowance or charge declares its reason more than once.","The standard allows the reason to appear at most once (mirrors rule ibr-sr-30).","Keep a single <code>AllowanceChargeReason</code> per allowance or charge.");});
+  const t=a.totals;
+  if(t.taxExcl!=null&&a.taxTotal!=null&&t.taxIncl!=null&&approx(t.taxIncl,t.taxExcl+a.taxTotal)===false)
+    add("AE-MATH-01","fatal","BT-112","Tax-inclusive total does not equal tax-exclusive plus VAT.","Tax inclusive ("+fmt(t.taxIncl)+") should equal tax exclusive ("+fmt(t.taxExcl)+") plus VAT ("+fmt(a.taxTotal)+") = "+fmt((t.taxExcl||0)+(a.taxTotal||0))+".","Recompute totals in the source system; the rounding tolerance is 0.01.");
+  if(t.lineExt!=null&&a.lines.length){const sum=a.lines.reduce((s,l)=>s+(l.amount||0),0);
+    if(approx(t.lineExt,sum)===false)add("AE-MATH-02","warning","BT-106","Sum of line amounts does not equal the declared line-extension total.","Line total declared "+fmt(t.lineExt)+"; lines add up to "+fmt(sum)+".","Reconcile line amounts with the header total.");}
+  if(a.root==="Invoice"){const negs=a.lines.filter(l=>l.amount!=null&&l.amount<0);
+    if(negs.length)add("AE-NEG-01","warning","BT-126","Invoice contains negative line amounts.","Negative amounts normally belong on a credit note, not an invoice.","Issue a credit note (type 381) instead.");}
+  if(!f.length)add("AE-OK-00","info","—","No issues detected by the built-in checks.","This invoice passes InvoiceFlow's heuristic checks. The certified schematron may apply deeper rules.","Validate against the accredited schematron before go-live.");
+  return f;
+}
+function isFuture(d){const t=Date.parse(d);return!isNaN(t)&&t>Date.now()+864e5;}
+function approx(a,b){if(a==null||b==null)return null;return Math.abs(a-b)<=0.011;}
+ 
+/* ---- test-scenario generation ---- */
+function generateScenarios(a){
+  const raw=a.raw;const S=[];const mk=(title,kind,rule,explain,mutate)=>S.push({title,kind,rule,explain,mutate});
+  mk("Remove the buyer TRN","negative","AE-TRN-B-01","Removes the buyer's tax registration number to test detection of an incomplete B2B party.",()=>mutate(raw,doc=>{const p=findFirst(doc.documentElement,"AccountingCustomerParty");findAll(p||doc.documentElement,"PartyTaxScheme").forEach(n=>n.parentNode.removeChild(n));}));
+  mk("Remove the invoice number","negative","AE-ID-01","Deletes the root identifier — the most basic fatal failure.",()=>mutate(raw,doc=>{const id=child(doc.documentElement,"ID");if(id)id.parentNode.removeChild(id);}));
+  mk("Blank the standard VAT rate","negative","AE-VAT-RATE-01","Strips the 5% rate from a standard-rated subtotal — a classic schematron fatal.",()=>mutate(raw,doc=>{findAll(doc.documentElement,"TaxCategory").forEach(cat=>{if(txt(child(cat,"ID"))==="S"){const p=child(cat,"Percent");if(p)p.parentNode.removeChild(p);}});}));
+  mk("Duplicate an allowance reason","negative","AE-ALLOW-DUP-01","Adds a second reason to an allowance — the reason-appears-once rule (ibr-sr-30).",()=>mutate(raw,doc=>{let ac=findFirst(doc.documentElement,"AllowanceCharge");if(!ac){ac=el(doc,"cac:AllowanceCharge");ac.appendChild(el(doc,"cbc:ChargeIndicator","false"));ac.appendChild(el(doc,"cbc:AllowanceChargeReason","Promotion"));ac.appendChild(el(doc,"cbc:Amount","0"));const lmt=child(doc.documentElement,"LegalMonetaryTotal");doc.documentElement.insertBefore(ac,lmt||null);}const r=child(ac,"AllowanceChargeReason")||el(doc,"cbc:AllowanceChargeReason","Promotion");ac.appendChild(r.cloneNode(true));}));
+  mk("Future-date the invoice","negative","AE-DATE-02","Sets the issue date 30 days ahead to test temporal sanity checks.",()=>mutate(raw,doc=>{let d=child(doc.documentElement,"IssueDate");const fut=new Date(Date.now()+30*864e5).toISOString().slice(0,10);if(!d){d=el(doc,"cbc:IssueDate",fut);doc.documentElement.appendChild(d);}else d.textContent=fut;}));
+  mk("Break the totals arithmetic","negative","AE-MATH-01","Corrupts the tax-inclusive total so it no longer equals exclusive plus VAT.",()=>mutate(raw,doc=>{const lmt=child(doc.documentElement,"LegalMonetaryTotal");const ti=child(lmt,"TaxInclusiveAmount");if(ti)ti.textContent=(num(ti.textContent)||0)+99.99;}));
+  mk("Use an invalid currency","negative","AE-CUR-02","Replaces the currency code with a non-ISO value.",()=>mutate(raw,doc=>{const c=child(doc.documentElement,"DocumentCurrencyCode");if(c)c.textContent="ZZ";}));
+  mk("Unmodified copy (baseline)","positive","AE-OK-00","An unchanged copy — the positive control that should pass every check.",()=>raw);
+  return S;
+}
+function el(doc,name,text){const e=doc.createElement(name);if(text!=null)e.textContent=text;return e;}
+function mutate(raw,fn){const doc=new DOMParser().parseFromString(raw,"application/xml");try{fn(doc);}catch(e){}return new XMLSerializer().serializeToString(doc);}
+ 
+/* ---- rendering ---- */
+const $=id=>document.getElementById(id);
+const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function active(){return state.sources.find(s=>s.id===state.activeId)||null;}
+function docIcon(){return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7e8799" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`;}
+ 
+function renderSources(){
+  const list=$("srcList");list.innerHTML="";
+  state.sources.forEach(s=>{const a=s.analysis;const fatal=(s.findings||[]).filter(x=>x.sev==="fatal").length;const warn=(s.findings||[]).filter(x=>x.sev==="warning").length;
+    const cats=a.ok?[...new Set(a.taxCategories.map(c=>c.id))].filter(Boolean):[];
+    const div=document.createElement("div");div.className="src"+(s.id===state.activeId?" active":"");div.onclick=()=>{state.activeId=s.id;render();};
+    let badges="";if(a.ok){badges+=`<span class="tag cat">${esc(a.typeName||a.root)}</span>`;cats.forEach(c=>badges+=`<span class="tag s">${esc(c)}</span>`);
+      if(fatal)badges+=`<span class="tag fail">${fatal} fatal</span>`;else if(warn)badges+=`<span class="tag warn">${warn} warning</span>`;else badges+=`<span class="tag s">valid</span>`;}
+    else badges=`<span class="tag fail">unparsable</span>`;
+    div.innerHTML=`<div class="nm">${docIcon()} ${esc(s.name)}</div><div class="meta">${badges}</div><button class="del" title="Remove">&times;</button>`;
+    div.querySelector(".del").onclick=e=>{e.stopPropagation();removeSource(s.id);};list.appendChild(div);});
+  const n=state.sources.length;$("globalStat").innerHTML=n?`<b>${n}</b> invoice${n>1?"s":""} · <b>${totalFindings()}</b> findings`:"No invoices loaded";
+}
+function totalFindings(){return state.sources.reduce((s,x)=>s+((x.findings||[]).filter(f=>f.sev!=="info").length),0);}
+ 
+function render(){
+  renderSources();const a=active();
+  const fc=a&&a.analysis.ok?(a.findings||[]).filter(f=>f.sev!=="info").length:0;
+  const lc=a&&a.analysis.ok?(a.scenarios||[]).length:0;
+  $("cntVal").textContent=fc;$("cntLab").textContent=lc;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===state.tab));
+  const body=$("canvasBody");
+  if(!a){body.innerHTML="";body.appendChild(emptyNode());return;}
+  if(!a.analysis.ok){body.innerHTML=`<div class="card"><h4>Cannot read file</h4><div class="finding fatal"><div class="msg">${esc(a.analysis.error)}</div><div class="ex">InvoiceFlow expects a UBL Invoice or CreditNote in PINT-AE form. Confirm the file opens as XML with an &lt;Invoice&gt; root.</div></div></div>`;return;}
+  if(state.tab==="view"){body.innerHTML=renderInvoiceView(a.analysis);const pb=$("printBtn");if(pb)pb.onclick=()=>window.print();}
+  else if(state.tab==="details")body.innerHTML=renderDetails(a.analysis);
+  else if(state.tab==="validation")body.innerHTML=renderValidation(a.analysis,a.findings);
+  else{body.innerHTML=renderLab(a);wireLab(a);}
+}
+function emptyNode(){const d=document.createElement("div");d.className="empty";
+  d.innerHTML=`<svg class="ill" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+  <h3>No invoice loaded</h3><p>Add a PINT-AE XML file, or load a sample, to view it as a formatted invoice, inspect its data, validate it, and generate test scenarios.</p>`;return d;}
+ 
+/* ---- VIEW: formatted, printable invoice ---- */
+function renderInvoiceView(a){
+  const cur=a.currency&&/^[A-Z]{3}$/.test(a.currency)?a.currency:"";
+  const sellerTrn=a.seller.trn?`<div class="strn">TRN ${esc(a.seller.trn)}</div>`:"";
+  const buyerTrn=a.buyer.trn?`<div class="bt-trn">TRN ${esc(a.buyer.trn)}</div>`:"";
+  const lines=a.lines.map((l,i)=>`<tr>
+      <td>${i+1}</td>
+      <td>${esc(l.name||"—")}${l.desc&&l.desc!==l.name?`<div class="desc-sub">${esc(l.desc)}</div>`:""}</td>
+      <td class="num">${esc(l.qty||"")}${l.unit?" "+esc(l.unit):""}</td>
+      <td class="num">${l.price!=null?fmt(l.price):"—"}</td>
+      <td>${l.vatCat?`<span class="catcode ${esc(l.vatCat)}">${esc(l.vatCat)}</span>${l.vatPct?" "+esc(l.vatPct)+"%":""}`:"—"}</td>
+      <td class="num">${fmt(l.amount)}</td></tr>`).join("");
+  const discount=a.totals.allowance;
+  const vatRows=a.taxCategories.map(c=>`<div class="trow sub"><span class="tk">VAT — ${esc(c.id)}${c.percent!==""?" @ "+esc(c.percent)+"%":""}</span><span class="tv">${fmt(c.tax)}</span></div>`).join("");
+  const notes=[];
+  if(a.allowances.length)a.allowances.forEach(al=>notes.push((al.charge?"Charge":"Allowance")+": "+(al.reasons.join(", ")||"—")+" ("+fmt(al.amount)+")"));
+  if(a.dueDate)notes.push("Payment due by "+esc(a.dueDate)+".");
+  const notesHtml=notes.length?`<div class="nt-lbl">Notes</div>${notes.map(n=>`<div>${esc(n)}</div>`).join("")}`:"";
+  return `
+  <div class="view-bar">
+    <span class="vh">Formatted invoice</span>
+    <button class="btn" id="printBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print / Save as PDF</button>
+  </div>
+  <div class="inv-doc" id="invoiceDoc">
+    <div class="inv-head">
+      <div class="inv-seller">
+        <div class="sname">${esc(a.seller.name||"Seller")}</div>
+        ${a.seller.addr?`<div class="sline">${esc(a.seller.addr)}</div>`:""}
+        ${sellerTrn}
+      </div>
+      <div class="inv-titleblock">
+        <div class="inv-title">${esc((a.typeName||"Invoice").toUpperCase())}</div>
+        <table class="inv-metatbl">
+          <tr><td class="k">Invoice No.</td><td class="v">${esc(a.id||"—")}</td></tr>
+          <tr><td class="k">Issue date</td><td class="v">${esc(a.issueDate||"—")}</td></tr>
+          ${a.dueDate?`<tr><td class="k">Due date</td><td class="v">${esc(a.dueDate)}</td></tr>`:""}
+          <tr><td class="k">Currency</td><td class="v">${esc(a.currency||"—")}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="inv-rule"></div>
+    <div class="inv-billto">
+      <div><div class="bt-lbl">Bill to</div><div class="bt-name">${esc(a.buyer.name||"Buyer")}</div>${a.buyer.addr?`<div class="bt-line">${esc(a.buyer.addr)}</div>`:""}${buyerTrn}</div>
+      ${a.seller.country?`<div><div class="bt-lbl">Supply from</div><div class="bt-line">${esc(a.seller.country)}</div></div>`:""}
+    </div>
+    <table class="inv-lines">
+      <thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th>VAT</th><th class="num">Amount</th></tr></thead>
+      <tbody>${lines||`<tr><td colspan="6" style="color:#8a93a4">No line items.</td></tr>`}</tbody>
+    </table>
+    <div class="inv-summary">
+      <div class="inv-notes">${notesHtml}</div>
+      <div class="inv-totbox">
+        <div class="trow"><span class="tk">Subtotal</span><span class="tv">${fmt(a.totals.lineExt)}</span></div>
+        ${discount!=null&&discount>0?`<div class="trow"><span class="tk">Discount</span><span class="tv">-${fmt(discount)}</span></div>`:""}
+        <div class="trow"><span class="tk">Taxable amount</span><span class="tv">${fmt(a.totals.taxExcl)}</span></div>
+        ${vatRows}
+        <div class="trow"><span class="tk">Total VAT</span><span class="tv">${fmt(a.taxTotal)}</span></div>
+        <div class="grand"><span class="gk">Amount due</span><span class="gv">${cur?cur+" ":""}${fmt(a.totals.payable)}</span></div>
+      </div>
+    </div>
+    <div class="inv-foot">
+      <span>${a.customization?"Profile: "+esc(a.customization):"PINT-AE e-invoice"}</span>
+      <span>Rendered by InvoiceFlow · not a tax document</span>
+    </div>
+  </div>`;
+}
+ 
+/* ---- DETAILS: decoded data + business terms ---- */
+function renderDetails(a){
+  const f=v=>v&&v!=="—"?esc(v):'<span style="color:var(--fail)">—</span>';
+  const cats=a.taxCategories.map(c=>`<tr><td><span class="catcode ${esc(c.id)}">${esc(c.id)}</span> <span style="color:var(--muted)">${esc((KB.taxCategories[c.id]||{}).name||"")}</span></td><td class="num">${c.percent!==""?esc(c.percent)+"%":"—"}</td><td class="num">${fmt(c.taxable)}</td><td class="num">${fmt(c.tax)}</td></tr>`).join("");
+  const lines=a.lines.slice(0,30).map(l=>`<tr><td class="mono">${esc(l.id||"")}</td><td>${esc(l.name||"")}</td><td class="num">${esc(l.qty||"")}</td><td><span class="catcode ${esc(l.vatCat)}">${esc(l.vatCat||"")}</span>${l.vatPct?" "+esc(l.vatPct)+"%":""}</td><td class="num">${fmt(l.amount)}</td></tr>`).join("");
+  const terms=a.terms.map(([code,val])=>`<span class="term"><span class="tc">${esc(code)}</span>${esc(String(val).slice(0,28))}</span>`).join("");
+  return `
+  <div class="card"><h4>Document</h4><div class="doc-id">${f(a.id)}</div>
+    <div class="doc-row">
+      <div class="field"><span class="lbl">Type <span class="bt">BT-3</span></span><span class="val">${esc(a.typeName)} ${a.typeCode?`<span class="mono" style="color:var(--muted)">(${esc(a.typeCode)})</span>`:""}</span></div>
+      <div class="field"><span class="lbl">Issued <span class="bt">BT-2</span></span><span class="val">${f(a.issueDate)}</span></div>
+      ${a.dueDate?`<div class="field"><span class="lbl">Due <span class="bt">BT-9</span></span><span class="val">${esc(a.dueDate)}</span></div>`:""}
+      <div class="field"><span class="lbl">Currency <span class="bt">BT-5</span></span><span class="val">${f(a.currency)}</span></div>
+    </div></div>
+  <div class="card"><h4>Parties</h4><div class="parties">
+    <div class="party"><div class="role">Seller</div><div class="pn">${f(a.seller.name)}</div><div class="trn ${a.seller.trn?"":"missing"}">TRN ${a.seller.trn?esc(a.seller.trn):"missing"}</div></div>
+    <div class="party"><div class="role">Buyer</div><div class="pn">${f(a.buyer.name)}</div><div class="trn ${a.buyer.trn?"":"missing"}">TRN ${a.buyer.trn?esc(a.buyer.trn):"missing"}</div></div>
+  </div></div>
+  ${a.taxCategories.length?`<div class="card"><h4>VAT breakdown</h4><table class="grid"><thead><tr><th>Category <span class="bt">BT-118</span></th><th class="num">Rate</th><th class="num">Taxable</th><th class="num">VAT</th></tr></thead><tbody>${cats}</tbody></table></div>`:""}
+  <div class="card"><h4>Totals</h4><div class="totals">
+    <div class="tot"><div class="k">Lines <span class="bt">BT-106</span></div><div class="v">${fmt(a.totals.lineExt)}</div></div>
+    <div class="tot"><div class="k">Net <span class="bt">BT-109</span></div><div class="v">${fmt(a.totals.taxExcl)}</div></div>
+    <div class="tot"><div class="k">VAT <span class="bt">BT-110</span></div><div class="v">${fmt(a.taxTotal)}</div></div>
+    <div class="tot payable"><div class="k">Payable <span class="bt">BT-115</span></div><div class="v">${esc(a.currency||"")} ${fmt(a.totals.payable)}</div></div>
+  </div></div>
+  ${a.lines.length?`<div class="card"><h4>Lines (${a.lines.length})</h4><table class="grid"><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th>VAT</th><th class="num">Amount</th></tr></thead><tbody>${lines}</tbody></table></div>`:""}
+  <div class="card"><h4>Business terms detected</h4><div class="terms">${terms}</div></div>`;
+}
+ 
+function renderValidation(a,findings){
+  const fatal=findings.filter(f=>f.sev==="fatal").length;const warn=findings.filter(f=>f.sev==="warning").length;const ok=findings.filter(f=>f.sev==="info").length;
+  let cls,vt,vs;
+  if(fatal){cls="fail";vt="Would be rejected";vs=`${fatal} fatal issue${fatal>1?"s":""} the schematron would block.`;}
+  else if(warn){cls="warn";vt="Valid, with warnings";vs=`Passes fatal checks; ${warn} item${warn>1?"s":""} to review.`;}
+  else{cls="pass";vt="Passes built-in checks";vs="No blocking issues detected.";}
+  const items=findings.filter(f=>f.sev!=="info"||(!fatal&&!warn)).map(f=>`<div class="finding ${f.sev}"><div class="fh"><span class="sev ${f.sev}">${f.sev}</span><span class="rid">${esc(f.id)}</span>${f.term&&f.term!=="—"?`<span class="bt">${esc(f.term)}</span>`:""}</div><div class="msg">${esc(f.msg)}</div><div class="ex">${f.ex}</div>${f.fix?`<div class="fix"><b>Fix:</b> ${f.fix}</div>`:""}</div>`).join("");
+  return `<div class="verdict ${cls}"><span class="dot"></span><div><div class="vt">${vt}</div><div class="vs">${vs}</div></div><div class="counts"><span class="f">${fatal} fatal</span><span class="w">${warn} warning</span><span class="o">pass</span></div></div>${items}<div class="legend"><b>Heuristic checks.</b> These mirror common PINT-AE schematron rules (identifiers prefixed <span class="mono">AE-</span>) but are not the certified validator. Use them to catch issues early, then confirm against the accredited schematron before go-live.</div>`;
+}
+ 
+function renderLab(src){
+  const s=src.scenarios||[];
+  const dl=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+  return `<div class="lab-intro">Generated from <b>${esc(src.name)}</b>. Each scenario mutates this invoice to exercise one rule. Download the resulting XML, run the check to confirm the rule fires, or add it as a new invoice to keep testing.</div>${s.map((sc,i)=>`<div class="scn" data-i="${i}"><div class="sh"><span class="kind ${sc.kind}">${sc.kind}</span><span class="st">${esc(sc.title)}</span></div><div class="se">${esc(sc.explain)}</div><div class="expect">Expected: <span class="rid">${esc(sc.rule)}</span></div><div class="scn-actions"><button class="btn primary" data-act="run">Run check</button><button class="btn" data-act="dl">${dl} Download XML</button><button class="btn" data-act="add">Add as invoice</button></div><div class="runres" data-res></div></div>`).join("")}`;
+}
+function wireLab(src){
+  document.querySelectorAll(".scn").forEach(node=>{const i=+node.dataset.i;const sc=src.scenarios[i];const res=node.querySelector("[data-res]");
+    node.querySelector('[data-act="run"]').onclick=()=>{const xml=sc.mutate();const a=parsePintAe(xml);
+      if(!a.ok){res.className="runres miss";res.textContent="The mutated file no longer parses: "+a.error;return;}
+      const fnd=validate(a);const hit=fnd.find(f=>f.id===sc.rule);
+      if(sc.kind==="positive"){const fatal=fnd.filter(f=>f.sev==="fatal").length;res.className="runres "+(fatal?"miss":"ok");res.textContent=fatal?`Baseline unexpectedly has ${fatal} fatal issue(s).`:"Baseline passes — positive control confirmed.";}
+      else if(hit){res.className="runres ok";res.innerHTML=`Rule <b>${esc(sc.rule)}</b> fired as expected — "${esc(hit.msg)}"`;}
+      else{res.className="runres miss";res.innerHTML=`Rule <b>${esc(sc.rule)}</b> did not fire. Fired: ${fnd.filter(f=>f.sev!=="info").map(f=>f.id).join(", ")||"none"}.`;}};
+    node.querySelector('[data-act="dl"]').onclick=()=>download(sc.mutate(),src.name.replace(/\.xml$/i,"")+"__"+sc.rule+".xml");
+    node.querySelector('[data-act="add"]').onclick=()=>addSource(src.name.replace(/\.xml$/i,"")+" ["+sc.rule+"].xml",sc.mutate());});
+}
+function download(text,name){const b=new Blob([text],{type:"application/xml"});const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);}
+ 
+/* ---- source management ---- */
+function addSource(name,raw){const analysis=parsePintAe(raw);const findings=analysis.ok?validate(analysis):[];const scenarios=analysis.ok?generateScenarios(analysis):[];
+  const s={id:idSeq++,name,raw,analysis,findings,scenarios};state.sources.push(s);state.activeId=s.id;state.tab="view";render();return s;}
+function removeSource(id){state.sources=state.sources.filter(s=>s.id!==id);if(state.activeId===id)state.activeId=state.sources.length?state.sources[0].id:null;render();}
+ 
+/* ---- file intake ---- */
+function readFiles(fl){[...fl].forEach(file=>{const r=new FileReader();r.onload=()=>addSource(file.name,r.result);r.readAsText(file);});}
+$("fileInput").addEventListener("change",e=>{readFiles(e.target.files);e.target.value="";});
+$("browseBtn").onclick=()=>$("fileInput").click();$("addBtn").onclick=()=>$("fileInput").click();
+$("sampleBtn").onclick=()=>addSource("sample-tax-invoice.xml",SAMPLE_GOOD);
+$("sampleBadBtn").onclick=()=>addSource("non-compliant-invoice.xml",SAMPLE_BAD);
+const dz=$("dropzone");
+["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("drag");}));
+dz.addEventListener("drop",e=>{if(e.dataTransfer.files.length)readFiles(e.dataTransfer.files);});
+ 
+/* tabs + responsive */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{state.tab=t.dataset.tab;render();});
+$("tglSources").onclick=()=>$("colSources").classList.toggle("hide");
+$("tglAgent").onclick=()=>$("colAgent").classList.toggle("hide");
+if(window.innerWidth<=1080){$("colSources").classList.add("hide");$("colAgent").classList.add("hide");}
+ 
+/* ============================================================ *
+ *  Assistant — grounded chat, /api/chat backend + local mode   *
+ * ============================================================ */
+const API_ENDPOINT="/api/chat";
+const CHIPS=[
+  {t:"Summarize this invoice",act:"explain"},
+  {t:"Why might it fail?",act:"why"},
+  {t:"Generate test scenarios",act:"tests"},
+  {t:"Map business terms",act:"terms"},
+  {t:"What is tax category AE?",act:"ask",q:"What is tax category AE (reverse charge) in UAE VAT?"},
+  {t:"What does an ASP do?",act:"ask",q:"What does an ASP do in the UAE e-invoicing model?"}
+];
+function renderChips(){const c=$("chips");c.innerHTML="";CHIPS.forEach(ch=>{const b=document.createElement("button");b.className="chip";b.textContent=ch.t;b.onclick=()=>chipAction(ch);c.appendChild(b);});}
+function pushMsg(role,html,raw){state.history.push({role,content:raw!=null?raw:html});const chat=$("chat");const d=document.createElement("div");d.className="msg "+(role==="user"?"user":"bot");d.innerHTML=role==="user"?esc(html):`<div class="bubble">${html}</div>`;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;}
+function botCard(inner){return `<div class="chat-card">${inner}</div>`;}
+function chipAction(ch){if(ch.act==="ask"){submit(ch.q);return;}const a=active();if(!a){pushMsg("bot","Load an invoice first, then I can analyse it for you.");return;}
+  if(ch.act==="explain")return localExplain(a.analysis);if(ch.act==="why")return localWhy(a);if(ch.act==="tests")return localTests(a);if(ch.act==="terms")return localTerms(a.analysis);}
+function localExplain(a){pushMsg("user","Summarize this invoice");
+  const cats=[...new Set(a.taxCategories.map(c=>c.id))].map(c=>`<code>${esc(c)}</code> ${(KB.taxCategories[c]||{}).name||""}`).join(", ");
+  pushMsg("bot",`<h5>${esc(a.typeName)} ${esc(a.id||"")}</h5><p>Issued <b>${esc(a.issueDate||"—")}</b> in <b>${esc(a.currency||"—")}</b>, from <b>${esc(a.seller.name||"unknown seller")}</b> to <b>${esc(a.buyer.name||"unknown buyer")}</b>.</p><p>It carries ${a.lines.length} line${a.lines.length!==1?"s":""}, VAT categories ${cats||"—"}, with <b>${esc(a.currency||"")} ${fmt(a.totals.payable)}</b> payable (net ${fmt(a.totals.taxExcl)} plus VAT ${fmt(a.taxTotal)}).</p>${botCard(`<div class="cct">${docIcon()} At a glance</div><div class="ccb">Seller TRN ${a.seller.trn?"present":"<b style='color:var(--fail)'>missing</b>"} · Buyer TRN ${a.buyer.trn?"present":"<b style='color:var(--warn)'>missing</b>"} · ${a.taxCategories.length} tax subtotal(s)</div>`)}`);}
+function localWhy(src){pushMsg("user","Why might it fail?");const f=(src.findings||[]).filter(x=>x.sev!=="info");
+  if(!f.length){pushMsg("bot","Nothing blocking — this invoice passes the built-in checks. Confirm against the certified schematron before go-live.");return;}
+  const rows=f.map(x=>`<div class="row"><span><span class="sev ${x.sev}" style="margin-right:6px">${x.sev}</span>${esc(x.msg)}</span><span class="mono rid">${esc(x.id)}</span></div>`).join("");
+  pushMsg("bot",`<p>I found ${f.length} issue${f.length>1?"s":""}. In business terms, each is a reason the invoice would be rejected:</p>${botCard(rows)}<p>Open the <b>Validation</b> tab for the fix on each.</p>`);}
+function localTests(src){pushMsg("user","Generate test scenarios");const s=src.scenarios||[];
+  const rows=s.map(sc=>`<div class="row"><span><span class="kind ${sc.kind}" style="margin-right:6px">${sc.kind}</span>${esc(sc.title)}</span><span class="mono rid">${esc(sc.rule)}</span></div>`).join("");
+  pushMsg("bot",`<p>Generated ${s.length} scenarios from this invoice — one variant per rule, plus a positive control. They are now in the <b>Test Lab</b> tab, where you can download each file or run the check.</p>${botCard(rows)}`);state.tab="lab";render();}
+function localTerms(a){pushMsg("user","Map business terms");const rows=a.terms.map(([c,v])=>`<div class="row"><span class="mono rid">${esc(c)}</span><span>${esc(TERM_LABELS[c]||"")}: <b>${esc(String(v).slice(0,30))}</b></span></div>`).join("");
+  pushMsg("bot",`<p>Business terms (BT-*) are the standard field names shared between business and technical teams:</p>${botCard(rows)}`);}
+ 
+async function submit(text){if(!text||state.busy)return;pushMsg("user",text);$("chatInput").value="";autosize();state.busy=true;$("sendBtn").disabled=true;
+  const typing=pushMsg("bot",`<span class="typing"><i></i><i></i><i></i></span>`);
+  try{const reply=await askAssistant(text);typing.querySelector(".bubble").innerHTML=mdToHtml(reply);state.history.push({role:"assistant",content:reply});}
+  catch(e){typing.querySelector(".bubble").innerHTML=mdToHtml(localAnswer(text));}
+  finally{state.busy=false;$("sendBtn").disabled=false;$("chat").scrollTop=$("chat").scrollHeight;}}
+function buildContext(){const a=active();
+  let ctx="You are the InvoiceFlow assistant: a concise, professional analyst helping someone understand UAE PINT-AE e-invoices. Explain clearly, connect technical detail to business meaning, and keep answers brief. ";
+  ctx+="Reference facts: "+JSON.stringify(KB.concepts)+" Tax categories: "+JSON.stringify(KB.taxCategories)+". ";
+  if(a&&a.analysis.ok){const x=a.analysis;ctx+="\nCURRENT INVOICE (analysed locally):\n"+JSON.stringify({id:x.id,type:x.typeName,issued:x.issueDate,currency:x.currency,seller:x.seller,buyer:x.buyer,taxCategories:x.taxCategories,totals:x.totals,vat:x.taxTotal,lineCount:x.lines.length,findings:(a.findings||[]).map(f=>({rule:f.id,severity:f.sev,issue:f.msg}))});}
+  else ctx+="\nNo invoice is currently open.";return ctx;}
+async function askAssistant(text){
+  const msgs=state.history.filter(m=>m.role==="user"||m.role==="assistant").slice(-8);msgs.push({role:"user",content:text});
+  const resp=await fetch(API_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system:buildContext(),messages:msgs})});
+  if(!resp.ok)throw new Error("api "+resp.status);
+  const data=await resp.json();const out=(data.reply||"").trim();if(!out)throw new Error("empty");setMode(true);return out;}
+function localAnswer(text){const q=text.toLowerCase();const a=active();
+  for(const[k,v]of Object.entries(KB.concepts)){if(q.includes(k.replace("-"," "))||q.includes(k))return v;}
+  const catHit=Object.keys(KB.taxCategories).find(c=>new RegExp("\\b"+c.toLowerCase()+"\\b|category "+c.toLowerCase()).test(q));
+  if(catHit){const c=KB.taxCategories[catHit];return `**Tax category ${catHit} — ${c.name} (${c.rate}).** ${c.note}`;}
+  if(/asp|service provider/.test(q))return KB.concepts.asp;if(/peppol|corner/.test(q))return KB.concepts["5-corner"];
+  if(/schematron|rule|ibr|validation/.test(q))return KB.concepts.schematron;if(/trn|registration number/.test(q))return KB.concepts.trn;if(/pint|format|ubl/.test(q))return KB.concepts.pint;
+  if(a&&a.analysis.ok&&/invoice|explain|summary|summar/.test(q)){const x=a.analysis;return `This is a **${x.typeName}** (${x.id||"no id"}) for **${x.currency||""} ${fmt(x.totals.payable)}**, ${x.seller.name||"seller"} to ${x.buyer.name||"buyer"}. ${(a.findings||[]).filter(f=>f.sev==='fatal').length?"It has fatal validation issues — see the Validation tab.":"It passes the built-in checks."}`;}
+  if(a&&a.analysis.ok&&/fail|reject|wrong|issue|problem/.test(q)){const f=(a.findings||[]).filter(x=>x.sev!=="info");return f.length?"Issues found: "+f.map(x=>`**${x.id}** — ${x.msg}`).join("; ")+". See the Validation tab for fixes.":"No blocking issues by the built-in checks.";}
+  return "I can summarize this invoice, explain why it might fail validation, cover UAE tax categories (S, Z, E, AE, O), TRNs, ASPs, Peppol, and the schematron concept. Use a quick action above, or ask about any of these. Live answers require the assistant service; meanwhile I am using built-in knowledge.";}
+function setMode(live){const m=$("agentMode");if(state.apiLive===live)return;state.apiLive=live;m.innerHTML=`<span class="md"></span>${live?"Online":"Offline"}`;m.className="mode"+(live?" live":"");}
+ 
+function mdToHtml(t){t=esc(t);t=t.replace(/`([^`]+)`/g,"<code>$1</code>");t=t.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  const lines=t.split(/\n/);let html="";let inUl=false;
+  for(let line of lines){if(/^\s*[-*]\s+/.test(line)){if(!inUl){html+="<ul>";inUl=true;}html+="<li>"+line.replace(/^\s*[-*]\s+/,"")+"</li>";}else{if(inUl){html+="</ul>";inUl=false;}if(line.trim())html+="<p>"+line+"</p>";}}
+  if(inUl)html+="</ul>";return html||"<p>…</p>";}
+function autosize(){const t=$("chatInput");t.style.height="auto";t.style.height=Math.min(t.scrollHeight,120)+"px";}
+$("chatInput").addEventListener("input",autosize);
+$("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();submit($("chatInput").value.trim());}});
+$("sendBtn").onclick=()=>submit($("chatInput").value.trim());
+ 
+(async function probe(){try{const r=await fetch(API_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({system:"healthcheck",messages:[{role:"user",content:"ping"}]})});setMode(r.ok);}catch(e){setMode(false);}})();
+ 
+/* ---- boot ---- */
+renderChips();
+pushMsg("bot",`<p>Welcome to <b>InvoiceFlow</b>. Load an invoice on the left, or a sample, to view it as a formatted document, inspect its data, validate it against PINT-AE rules, and generate test scenarios.</p><p>Ask me to summarize a document, explain why it would fail validation, or clarify any UAE e-invoicing concept.</p>`);
+render();
+ 
+/* ---- embedded samples ---- */
+const SAMPLE_GOOD=`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:peppol:pint:billing-1@ae-1</cbc:CustomizationID>
+  <cbc:ProfileID>urn:peppol:bis:billing</cbc:ProfileID>
+  <cbc:ID>INV-2026-00471</cbc:ID>
+  <cbc:IssueDate>2026-06-10</cbc:IssueDate>
+  <cbc:DueDate>2026-07-10</cbc:DueDate>
+  <cbc:InvoiceTypeCode>388</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>AED</cbc:DocumentCurrencyCode>
+  <cac:AccountingSupplierParty><cac:Party>
+    <cac:PartyName><cbc:Name>AlNoor Trading LLC</cbc:Name></cac:PartyName>
+    <cac:PostalAddress><cbc:StreetName>Sheikh Zayed Road</cbc:StreetName><cbc:CityName>Dubai</cbc:CityName><cac:Country><cbc:IdentificationCode>AE</cbc:IdentificationCode></cac:Country></cac:PostalAddress>
+    <cac:PartyTaxScheme><cbc:CompanyID>100123456700003</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>
+    <cac:PartyLegalEntity><cbc:RegistrationName>AlNoor Trading LLC</cbc:RegistrationName></cac:PartyLegalEntity>
+  </cac:Party></cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty><cac:Party>
+    <cac:PartyName><cbc:Name>Gulf Distributors FZE</cbc:Name></cac:PartyName>
+    <cac:PostalAddress><cbc:CityName>Sharjah</cbc:CityName><cac:Country><cbc:IdentificationCode>AE</cbc:IdentificationCode></cac:Country></cac:PostalAddress>
+    <cac:PartyTaxScheme><cbc:CompanyID>100987654300003</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>
+    <cac:PartyLegalEntity><cbc:RegistrationName>Gulf Distributors FZE</cbc:RegistrationName></cac:PartyLegalEntity>
+  </cac:Party></cac:AccountingCustomerParty>
+  <cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:AllowanceChargeReason>Volume discount</cbc:AllowanceChargeReason><cbc:Amount currencyID="AED">50.00</cbc:Amount></cac:AllowanceCharge>
+  <cac:TaxTotal><cbc:TaxAmount currencyID="AED">147.50</cbc:TaxAmount>
+    <cac:TaxSubtotal><cbc:TaxableAmount currencyID="AED">2950.00</cbc:TaxableAmount><cbc:TaxAmount currencyID="AED">147.50</cbc:TaxAmount>
+      <cac:TaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>5</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="AED">3000.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="AED">2950.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="AED">3097.50</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="AED">50.00</cbc:AllowanceTotalAmount>
+    <cbc:PayableAmount currencyID="AED">3097.50</cbc:PayableAmount></cac:LegalMonetaryTotal>
+  <cac:InvoiceLine><cbc:ID>1</cbc:ID><cbc:InvoicedQuantity unitCode="EA">10</cbc:InvoicedQuantity><cbc:LineExtensionAmount currencyID="AED">2000.00</cbc:LineExtensionAmount>
+    <cac:Item><cbc:Name>Steel fittings (box)</cbc:Name><cac:ClassifiedTaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>5</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="AED">200.00</cbc:PriceAmount></cac:Price></cac:InvoiceLine>
+  <cac:InvoiceLine><cbc:ID>2</cbc:ID><cbc:InvoicedQuantity unitCode="EA">5</cbc:InvoicedQuantity><cbc:LineExtensionAmount currencyID="AED">1000.00</cbc:LineExtensionAmount>
+    <cac:Item><cbc:Name>Installation service</cbc:Name><cac:ClassifiedTaxCategory><cbc:ID>S</cbc:ID><cbc:Percent>5</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="AED">200.00</cbc:PriceAmount></cac:Price></cac:InvoiceLine>
+</Invoice>`;
+ 
+const SAMPLE_BAD=`<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:peppol:pint:billing-1@ae-1</cbc:CustomizationID>
+  <cbc:ID>INV-2026-00472</cbc:ID>
+  <cbc:InvoiceTypeCode>388</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>AED</cbc:DocumentCurrencyCode>
+  <cac:AccountingSupplierParty><cac:Party>
+    <cac:PartyName><cbc:Name>Desert Tech FZ-LLC</cbc:Name></cac:PartyName>
+    <cac:PostalAddress><cbc:CityName>Dubai</cbc:CityName><cac:Country><cbc:IdentificationCode>AE</cbc:IdentificationCode></cac:Country></cac:PostalAddress>
+    <cac:PartyLegalEntity><cbc:RegistrationName>Desert Tech FZ-LLC</cbc:RegistrationName></cac:PartyLegalEntity>
+  </cac:Party></cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty><cac:Party>
+    <cac:PartyName><cbc:Name>Marina Retail LLC</cbc:Name></cac:PartyName>
+    <cac:PartyLegalEntity><cbc:RegistrationName>Marina Retail LLC</cbc:RegistrationName></cac:PartyLegalEntity>
+  </cac:Party></cac:AccountingCustomerParty>
+  <cac:AllowanceCharge><cbc:ChargeIndicator>false</cbc:ChargeIndicator><cbc:AllowanceChargeReason>Loyalty</cbc:AllowanceChargeReason><cbc:AllowanceChargeReason>Loyalty discount</cbc:AllowanceChargeReason><cbc:Amount currencyID="AED">25.00</cbc:Amount></cac:AllowanceCharge>
+  <cac:TaxTotal><cbc:TaxAmount currencyID="AED">0.00</cbc:TaxAmount>
+    <cac:TaxSubtotal><cbc:TaxableAmount currencyID="AED">1500.00</cbc:TaxableAmount><cbc:TaxAmount currencyID="AED">0.00</cbc:TaxAmount>
+      <cac:TaxCategory><cbc:ID>S</cbc:ID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="AED">1500.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="AED">1500.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="AED">1575.00</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="AED">1575.00</cbc:PayableAmount></cac:LegalMonetaryTotal>
+  <cac:InvoiceLine><cbc:ID>1</cbc:ID><cbc:InvoicedQuantity unitCode="EA">3</cbc:InvoicedQuantity><cbc:LineExtensionAmount currencyID="AED">1500.00</cbc:LineExtensionAmount>
+    <cac:Item><cbc:Name>Laptop docking station</cbc:Name><cac:ClassifiedTaxCategory><cbc:ID>S</cbc:ID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>
+    <cac:Price><cbc:PriceAmount currencyID="AED">500.00</cbc:PriceAmount></cac:Price></cac:InvoiceLine>
+</Invoice>`;
+</script>
+</body>
+</html>
