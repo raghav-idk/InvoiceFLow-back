@@ -1,9 +1,9 @@
-fetch("/api/chat", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-        message: userMessage
-    })
-});
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/chat",
+      "destination": "/api/chat.py"
+    }
+  ]
+}
