@@ -1,370 +1,188 @@
 # InvoiceFlow
-
-> A workspace for understanding, validating, and testing UAE e-invoices — with a built-in AI assistant.
-
-![HTML](https://img.shields.io/badge/Frontend-HTML5-orange)
-![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow)
-![Python](https://img.shields.io/badge/Backend-Python-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-
-InvoiceFlow takes a UAE **PINT-AE XML e-invoice**, converts it into a human-readable invoice, validates it against common UAE compliance rules, lets you intentionally generate broken invoices for testing, and answers questions about the invoice in plain English.
-
-If you have no idea what any of that means yet—that's perfectly fine. This README starts from the basics.
-
+ 
+**A workspace for understanding, checking, and testing UAE e-invoices — with a built-in assistant.**
+ 
+InvoiceFlow takes a UAE e-invoice file (an XML document in the *PINT-AE* format), turns it into something a normal person can read, checks it for the kinds of mistakes that would get it rejected, lets you generate broken test versions on purpose, and answers your questions about it in plain language.
+ 
+If you have no idea what any of that means yet — that's the point of this README. Start at the top.
+ 
 ---
-
-# Table of Contents
-
-- [What Problem Does This Solve?](#what-problem-does-this-solve)
-- [The 60-Second Background](#the-60-second-background)
-- [Features](#features)
-- [How It Works](#how-it-works)
-- [Quick Start](#quick-start)
-- [Deploy on Vercel](#deploy-on-vercel)
-- [Run Locally](#run-locally)
-- [Project Structure](#project-structure)
-- [Tech Stack](#tech-stack)
-- [Limitations](#limitations)
+ 
+## Table of contents
+ 
+- [What problem does this solve?](#what-problem-does-this-solve)
+- [The 60-second background](#the-60-second-background)
+- [What InvoiceFlow does](#what-invoiceflow-does)
+- [How it works](#how-it-works)
+- [Try it in 30 seconds](#try-it-in-30-seconds)
+- [Deploy your own copy (Vercel)](#deploy-your-own-copy-vercel)
+- [Running it locally](#running-it-locally)
+- [Project structure](#project-structure)
+- [Tech stack](#tech-stack)
+- [Important limitations](#important-limitations)
+- [Roadmap](#roadmap)
 - [Glossary](#glossary)
-
 ---
-
-# What Problem Does This Solve?
-
-Traditional invoices are designed for humans.
-
-UAE e-invoices are designed for **computers**.
-
-Instead of receiving a PDF or printed invoice, businesses exchange invoices as **structured XML documents** following the **PINT-AE** standard.
-
-Unfortunately:
-
-- XML invoices are difficult for humans to read.
-- Tiny mistakes cause invoices to be rejected.
-- Debugging validation failures is frustrating.
-- Practicing with intentionally broken invoices is difficult.
-
-**InvoiceFlow** solves these problems.
-
-Simply upload a PINT-AE invoice and the application will:
-
-- 📄 Render it into a clean invoice
-- ✅ Validate compliance
-- ⚠ Explain errors in plain English
-- 🧪 Simulate broken invoices
-- 🤖 Answer questions about the invoice
-
+ 
+## What problem does this solve?
+ 
+An **invoice** is the document a seller gives a buyer that says "here's what you bought and what you owe." You've seen hundreds of them — a receipt from a shop, a bill from a service.
+ 
+The United Arab Emirates is moving from paper/PDF invoices to **electronic invoices**: instead of a human-readable document, businesses must send invoices as **structured data** — a file a computer can read field-by-field — in a specific government-approved format. That format has strict rules, and if an invoice breaks even one rule, it gets **rejected** and can't be sent or reported to the tax authority.
+ 
+This creates two everyday headaches:
+ 
+1. **The files are unreadable to humans.** A valid e-invoice looks like a wall of `<xml>` tags. A finance person can't glance at it and understand it.
+2. **It's hard to know *why* an invoice was rejected**, or to safely practise with broken examples before going live.
+**InvoiceFlow tackles both.** Drop in an e-invoice file and it shows you the actual invoice, tells you whether it would pass or fail (and why, in plain English), and helps you create test cases.
+ 
 ---
-
-# The 60-Second Background
-
-Here are a few terms you'll encounter.
-
-| Term | Meaning |
-|-------|---------|
-| **PINT-AE** | UAE's official e-invoice XML format |
-| **Schematron** | Rulebook used to validate invoices |
-| **ASP** | Accredited Service Provider that validates and routes invoices |
-| **Peppol** | International secure e-invoicing network |
-| **TRN** | UAE Tax Registration Number |
-
+ 
+## The 60-second background
+ 
+A few terms you'll meet. You don't need to memorise these — there's a [glossary](#glossary) at the bottom — but here's the shape of the world InvoiceFlow lives in:
+ 
+- **PINT-AE** — the UAE's official e-invoice format. It's structured XML built on an international standard (UBL/Peppol), localised with UAE-specific rules. This is the file type InvoiceFlow reads.
+- **Schematron** — think of it as the *rulebook*. It's a set of automated checks ("an invoice must have a number," "a 5% VAT line must state its rate," and so on). Each rule has an ID. If an invoice breaks a rule, that rule "fires" and the invoice is rejected.
+- **ASP (Accredited Service Provider)** — a government-certified middleman. UAE businesses can't send invoices straight to the tax authority; they go through an ASP, which validates the invoice, transmits it, and reports the tax data.
+- **Peppol** — the network the invoices travel over. Like an email system for business documents: any connected sender can reach any connected receiver.
+- **FTA** — the UAE Federal Tax Authority, the government body that ultimately receives the tax data.
+- **TRN** — Tax Registration Number, the 15-digit ID of a VAT-registered business.
+The rollout is happening in phases, with the largest businesses required to comply first. The practical upshot for anyone building or operating in this space: **every invoice must be perfectly formatted and rule-compliant before it leaves the building** — which is exactly what InvoiceFlow helps you see and test.
+ 
 ---
-
-# Features
-
-InvoiceFlow consists of a **Pre-flight Upload Stage**, four workspace tabs, and an AI assistant.
-
+ 
+## What InvoiceFlow does
+ 
+The app has four tabs and an assistant.
+ 
+| Tab | What it gives you |
+|-----|-------------------|
+| **View** | Renders the raw XML as a clean, formatted invoice — seller, buyer, line items, VAT breakdown, amount due. There's a **Print / Save as PDF** button. This is the "finally, I can read it" view. |
+| **Details** | The decoded data behind the invoice: every key field tagged with its standard *business term* code (BT-1, BT-110…), the VAT breakdown, totals, and line items. The bridge between the human view and the technical structure. |
+| **Validation** | Runs a set of checks and gives a verdict — *would this be accepted or rejected?* Each issue is shown with its severity, the rule it relates to, a plain-English explanation, and how to fix it. |
+| **Test Lab** | Generates test scenarios from your invoice — broken variants that each trigger one specific rule, plus a clean "control" copy. You can **download** each variant, **run the check** to confirm the rule fires, or **add it back** as a new invoice to keep experimenting. |
+ 
+**The Assistant** (right sidebar) is grounded in whatever invoice you have open. Ask it to summarise the document, explain why it would fail, or clarify any concept (tax categories, TRNs, ASPs, Peppol). When the backend is connected it uses an AI model for free-form answers; when it isn't, it falls back to built-in answers so the panel still works.
+ 
+You don't need your own files to explore — there's a **Load sample** and a **Load non-compliant sample** button built in.
+ 
 ---
-
-## 🚀 Pre-flight Upload
-
-Before an invoice enters the workspace, InvoiceFlow performs a preliminary inspection.
-
-### Left Panel
-
-- Extracts key Business Terms (BT-1 → BT-115)
-- Parses seller & buyer details
-- Displays totals
-- Checks basic compliance
-- Detects fatal validation issues
-
-### Right Panel
-
-Displays:
-
-- Raw XML
-- Syntax highlighting
-- Scrollable viewer
-- Easy cross-referencing
-
----
-
-## 📄 View
-
-Transforms unreadable XML into a familiar invoice.
-
-Includes:
-
-- Seller information
-- Buyer information
-- Invoice lines
-- VAT summary
-- Total payable
-
-Also supports:
-
-- Print
-- Save as PDF
-
----
-
-## 📑 Details
-
-Shows decoded invoice metadata.
-
-Examples include:
-
-- BT-1
-- BT-31
-- BT-110
-
-Along with:
-
-- Tax categories
-- VAT subtotals
-- Currency
-- Local UAE guidelines
-
----
-
-## ✅ Validation
-
-Runs a heuristic UAE compliance engine.
-
-Checks include:
-
-- Missing mandatory fields
-- Invalid TRNs
-- VAT calculations
-- Structural consistency
-- Mathematical tolerances (±0.1 AED)
-
-Every issue includes:
-
-- Severity
-- Rule ID
-- Explanation
-- Suggested fix
-
----
-
-## 🧪 Test Lab
-
-Generate intentionally broken invoices.
-
-Examples:
-
-- Missing Seller TRN
-- Invalid VAT
-- Incorrect totals
-- Missing invoice number
-
-Useful for learning how validation behaves before production deployment.
-
----
-
-## 🤖 AI Assistant
-
-The assistant understands the currently loaded invoice.
-
-Ask questions like:
-
-- Is my invoice valid?
-- Explain this VAT calculation.
-- What is a Peppol Access Point?
-- Why did validation fail?
-- Explain UAE e-invoicing.
-
-When connected to the backend:
-
-- Uses a live LLM.
-
-When offline:
-
-- Falls back to built-in knowledge.
-
----
-
-# How It Works
-
+ 
+## How it works
+ 
+InvoiceFlow is deliberately split so that the useful parts work anywhere, and only the AI chat needs a server.
+ 
 ```
-Browser
-┌────────────────────────────┐
-│ Upload XML                 │
-│ Pre-flight Parser          │
-│ Invoice Renderer           │
-│ Validation Engine          │
-│ Test Lab                   │
-│ Chat Interface             │
-└──────────────┬─────────────┘
-               │ POST /api/chat
-               ▼
-Server (Optional)
-┌────────────────────────────┐
-│ chat.py                    │
-│ Stores API key             │
-│ Calls LLM                  │
-│ Returns response           │
-└────────────────────────────┘
+   Browser (index.html)                         Server (only for chat)
+   ┌─────────────────────────────┐              ┌──────────────────────────┐
+   │  Reads the XML file          │              │  api/chat.py (Python)     │
+   │  Decodes it → View / Details │   POST       │  • holds the API key      │
+   │  Runs validation checks      │  /api/chat   │  • calls the AI model     │
+   │  Generates test scenarios    │ ───────────▶ │  • returns the reply      │
+   │  Chat UI                     │ ◀─────────── │                          │
+   └─────────────────────────────┘   { reply }   └──────────────────────────┘
+        all of this runs locally,                   key never reaches the
+        with no server needed                       browser
 ```
-
-Everything except live AI chat runs **entirely inside your browser**.
-
-No invoice data is uploaded during:
-
-- Preview
-- Parsing
-- Validation
-- Rendering
-
+ 
+- **Everything except the chat runs entirely in your browser** — reading the file, the View, validation, and test generation. No data is uploaded; nothing leaves your machine for those features.
+- **The chat is the only part that needs a backend.** A tiny Python function holds the AI key on the server and relays messages, so the secret key is never exposed in the page. If that backend isn't set up, the chat simply shows **Offline** and uses its built-in knowledge — the rest of the app is unaffected.
 ---
-
-# Quick Start
-
-## Option 1
-
-Open:
-
-```
-index.html
-```
-
-Then:
-
-1. Load sample invoice
-2. Load non-compliant sample
-3. Upload your own PINT-AE XML
-4. Explore validation results
-
+ 
+## Try it in 30 seconds
+ 
+1. Open the app (your deployed URL, or `index.html` in a browser).
+2. In the left panel, click **Load sample**.
+3. You'll land on the **View** tab — a fully formatted invoice. Click through **Details**, **Validation**, and **Test Lab**.
+4. Now click **Load non-compliant sample** to see the Validation tab light up with real issues and fixes.
+The chat will say **Offline** until you connect the backend (next section) — that's expected, and everything else still works.
+ 
 ---
-
-# Deploy on Vercel
-
-Push the repository to GitHub.
-
-Create a new Vercel project.
-
-Add an environment variable:
-
-```
-ANTHROPIC_API_KEY
-```
-
-Redeploy.
-
-Your AI assistant is now live.
-
+ 
+## Deploy your own copy (Vercel)
+ 
+This repo is set up to deploy on [Vercel](https://vercel.com) with no build step.
+ 
+1. **Push this folder to GitHub** (you've likely already done this).
+2. On Vercel, click **Add New… → Project** and **import** your GitHub repo. There's no framework to choose and no build command — `index.html` is served as-is, and the `api/` folder automatically becomes serverless functions.
+3. To enable the chat, add your AI key as an **environment variable** (this is *the only place* the key is entered — never in the app itself):
+   - Vercel project → **Settings → Environment Variables**
+   - Name: `GEMINI_API_KEY`
+   - Value: your key from [console.cloud.google.com](https://console.cloud.google.com/ai/model-garden/models?models_filter=chat) (enable the Generative AI API if needed)
+   - Apply to all environments, then **save**.
+4. **Redeploy.** Environment variables only take effect on a fresh deployment: go to **Deployments → ⋯ → Redeploy**. (Forgetting this step is the most common reason the chat stays offline.)
+Once redeployed, reload the app — the assistant should switch to **Online**.
+ 
+> **Sanity check:** visit `https://your-app.vercel.app/api/chat` in a browser. If you see `{"status": "InvoiceFlow chat endpoint. Use POST."}`, the backend is live and the issue (if any) is the key. A 404 means the function didn't deploy — confirm `api/chat.py` and `requirements.txt` are in the repo.
+ 
 ---
-
-# Run Locally
-
-Open directly:
-
-```
-index.html
-```
-
-Everything works except live AI.
-
-To enable AI locally:
-
+ 
+## Running it locally
+ 
+- **Quickest:** just open `index.html` in your browser. Everything works except the live chat (it runs in offline mode, since there's no server to hold the key).
+- **With the chat:** use Vercel's dev server, which runs the Python function for you:
 ```bash
-npm i -g vercel
-
-cd invoiceflow
-
-vercel env add ANTHROPIC_API_KEY
-
-vercel dev
+  npm i -g vercel
+  cd invoiceflow
+  vercel env add GEMINI_API_KEY        # paste your key when prompted
+  vercel dev                           # serves the app + /api/chat locally
 ```
-
+  Open the URL it prints (usually `http://localhost:3000`).
+ 
 ---
-
-# Project Structure
-
+ 
+## Project structure
+ 
 ```
 .
-├── index.html
-├── api
-│   └── chat.py
-├── requirements.txt
-├── vercel.json
-└── README.md
+├── index.html        The entire app (UI + invoice parsing, validation, test gen)
+├── api/
+│   └── chat.py        Vercel serverless function: relays chat to the AI model
+├── requirements.txt   Python dependency (google-genai)
+├── vercel.json        Serverless function settings
+└── README.md          This file
 ```
-
+ 
+## Tech stack
+ 
+- **Frontend:** a single `index.html` — plain HTML, CSS, and JavaScript, no frameworks or build step. Invoice parsing uses the browser's built-in XML tools.
+- **Backend (optional):** one Python serverless function on Vercel that talks to the Google Generative AI API (Gemini model).
+- **AI:** Google Gemini, used only for the free-form chat answers.
 ---
-
-# Tech Stack
-
-## Frontend
-
-- HTML5
-- CSS3
-- Vanilla JavaScript (ES6)
-- DOMParser API
-
-## Backend
-
-- Python
-- Vercel Serverless Functions
-- Anthropic API
-
+ 
+## Important limitations
+ 
+Please read these before relying on InvoiceFlow for anything official.
+ 
+- **The validation is *heuristic*, not the certified rulebook.** InvoiceFlow's checks (their IDs start with `AE-`) imitate common PINT-AE rules to help you catch problems early and learn. They are **not** the official, accredited schematron and won't catch every rule. Always validate against the certified validator before going live.
+- **The "View" is a reading aid, not a legal document.** It re-draws the invoice data so humans can understand it; it is not an official tax invoice.
+- **No data is stored.** Invoices you load live only in the current browser session and disappear on refresh.
 ---
-
-# Limitations
-
-### Validation Engine
-
-InvoiceFlow implements heuristic UAE validation rules.
-
-It is **not** the official government Schematron validator.
-
-Always verify invoices using the official UAE sandbox before production.
-
+ 
+## Roadmap
+ 
+- Swap the heuristic checks for the **real PINT-AE schematron** via a dedicated validation service (the certified rules run on a Java engine, which would live as a separate microservice the app calls).
+- Side-by-side diff of an original invoice versus a mutated test variant.
+- Export all generated test scenarios as a batch.
 ---
-
-### No Data Storage
-
-InvoiceFlow stores nothing permanently.
-
-Everything lives inside the browser session.
-
-Refreshing the page clears:
-
-- invoices
-- validation results
-- AI conversations
-
----
-
-# Glossary
-
-| Term | Meaning |
-|------|---------|
-| **e-Invoice** | Structured invoice readable by computers |
-| **PINT-AE** | UAE's official XML invoice format |
-| **XML** | Structured markup language |
-| **Schematron** | Validation rules |
-| **Validation** | Checking compliance against rules |
-| **ASP** | Accredited Service Provider |
-| **TRN** | Tax Registration Number |
-| **Tax Category** | VAT classification codes |
-| **Business Term (BT)** | Standardized invoice field IDs |
-
----
-
-# Disclaimer
-
-InvoiceFlow is an **independent educational and validation workspace**.
-
-It is **not affiliated with the UAE Federal Tax Authority (FTA)** and does **not constitute legal, tax, or accounting advice**.
+ 
+## Glossary
+ 
+| Term | Plain meaning |
+|------|---------------|
+| **e-invoice** | An invoice sent as structured data a computer can read, not a PDF or paper. |
+| **PINT-AE** | The UAE's official structured e-invoice format (XML, based on UBL/Peppol). |
+| **XML** | A text format that stores data in labelled tags — readable by machines, awkward for humans. |
+| **UBL** | A widely used international standard for business documents that PINT-AE builds on. |
+| **Schematron** | A rulebook of automated checks an invoice must pass; each rule has an ID and "fires" when broken. |
+| **Validation** | Running an invoice through the rules to see whether it passes or is rejected. |
+| **ASP** | Accredited Service Provider — the certified middleman that validates and transmits invoices to the tax authority. |
+| **Peppol** | The network e-invoices travel over, like email for business documents. |
+| **FTA** | UAE Federal Tax Authority — the government body receiving the tax data. |
+| **TRN** | Tax Registration Number — the 15-digit ID of a VAT-registered business. |
+| **VAT** | Value Added Tax — 5% standard rate in the UAE. |
+| **Tax category** | The VAT treatment of a line: S (standard 5%), Z (zero-rated), E (exempt), AE (reverse charge), O (out of scope). |
+| **Business term (BT)** | A standard name for an invoice field (e.g. BT-1 = invoice number) shared across systems. |
+| **Credit note** | A "negative invoice" that cancels or reduces an earlier one (for returns or corrections). |
+ 
