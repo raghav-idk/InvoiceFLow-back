@@ -1,73 +1,118 @@
+"""
+InvoiceFlow chat backend — Vercel Python serverless function (Google Gemini).
+
+Dependency-free: calls the Gemini REST API directly with urllib, so no
+requirements.txt entry is needed.
+
+Contract (must match index.html):
+  Request  POST /api/chat  { "system": "...", "messages": [ {role, content}, ... ] }
+  Response 200             { "reply": "..." }
+Set GEMINI_API_KEY in Vercel → Settings → Environment Variables, then redeploy.
+"""
+
 import json
 import os
 import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler
 
+MODEL = "gemini-2.5-flash"          # stable; avoids preview-model deprecation
+MAX_OUTPUT_TOKENS = 1024
+ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
 class handler(BaseHTTPRequestHandler):
+    def _send(self, code, payload):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def do_GET(self):
+        self._send(200, {"status": "InvoiceFlow chat endpoint. Use POST."})
+
     def do_POST(self):
-        # 1. Read incoming request body from your HTML front-end
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        req_body = json.loads(post_data.decode('utf-8'))
-        
-        # 2. Grab your Gemini API key securely from Vercel's environment variables
+        # 1) Read and parse the request body.
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            req = json.loads(self.rfile.read(length) or b"{}")
+        except Exception:
+            return self._send(400, {"error": "Invalid JSON body."})
+
+        # 2) Health-check used by the frontend probe — answer without calling Gemini.
+        if req.get("system") == "healthcheck":
+            return self._send(200, {"reply": "ok"})
+
+        # 3) Key check.
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "GEMINI_API_KEY environment variable is not configured on Vercel."}).encode('utf-8'))
-            return
+            return self._send(503, {"error": "GEMINI_API_KEY is not configured on Vercel."})
 
-        # 3. Target the Gemini 2.5 Flash model endpoint
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key={api_key}"
-        
-        # 4. Construct the payload for Gemini
-        gemini_payload = {
-            "contents": [{"parts": [{"text": req_body.get("text", "")}]}],
-            "systemInstruction": {"parts": [{"text": req_body.get("systemPrompt", "")}]}
+        # 4) Build Gemini `contents` from the frontend's messages array.
+        #    Gemini roles are "user" / "model" (assistant -> model).
+        messages = req.get("messages") or []
+        contents = []
+        for m in messages:
+            role = m.get("role")
+            text = str(m.get("content", "")).strip()
+            if role in ("user", "assistant") and text:
+                contents.append({
+                    "role": "model" if role == "assistant" else "user",
+                    "parts": [{"text": text}],
+                })
+        # Backward-compat: accept a single {text:""} shape too.
+        if not contents and req.get("text"):
+            contents = [{"role": "user", "parts": [{"text": str(req["text"])}]}]
+        if not contents:
+            return self._send(400, {"error": "No messages provided."})
+
+        payload = {
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": MAX_OUTPUT_TOKENS,
+                # Gemini 2.5 "thinks" by default and can spend the whole output
+                # budget on it, returning an empty reply. Turn it off here.
+                "thinkingConfig": {"thinkingBudget": 0},
+            },
         }
-        
-        data = json.dumps(gemini_payload).encode('utf-8')
-        
-        # 5. Forward the request to Google's API
-        req = urllib.request.Request(
-            url, 
-            data=data, 
-            headers={'Content-Type': 'application/json'},
-            method='POST'
+        system = str(req.get("system") or req.get("systemPrompt") or "")
+        if system:
+            payload["systemInstruction"] = {"parts": [{"text": system}]}
+
+        # 5) Call Gemini.
+        url = ENDPOINT.format(model=MODEL) + "?key=" + api_key
+        data = json.dumps(payload).encode("utf-8")
+        http_req = urllib.request.Request(
+            url, data=data, headers={"Content-Type": "application/json"}, method="POST"
         )
-        
         try:
-            with urllib.request.urlopen(req) as response:
-                res_data = response.read()
-                gemini_json = json.loads(res_data.decode('utf-8'))
-                
-                # Extract text response from Gemini's nested structure
-                reply_text = gemini_json['candidates'][0]['content']['parts'][0]['text']
-                
-                # Send response back to index.html
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                # Optional: Enable CORS if testing locally across different ports
-                self.send_header('Access-Control-Allow-Origin', '*') 
-                self.end_headers()
-                
-                output = {"reply": reply_text}
-                self.wfile.write(json.dumps(output).encode('utf-8'))
-                
+            with urllib.request.urlopen(http_req, timeout=30) as resp:
+                gj = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
-            self.send_response(e.code)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
-            error_msg = e.read().decode('utf-8')
-            self.wfile.write(json.dumps({"error": "Gemini API error", "details": error_msg}).encode('utf-8'))
-            
-    def do_OPTIONS(self):
-        # Handle preflight CORS requests for local development
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+            detail = e.read().decode("utf-8", "ignore")
+            return self._send(502, {"error": "Gemini API error", "status": e.code, "details": detail})
+        except Exception as e:
+            return self._send(502, {"error": "Upstream error: " + str(e)})
+
+        # 6) Extract the text safely (guard against blocks / empty candidates).
+        candidates = gj.get("candidates") or []
+        if not candidates:
+            block = (gj.get("promptFeedback") or {}).get("blockReason")
+            return self._send(502, {"error": "No response from model" + (f" (blocked: {block})" if block else "") + "."})
+        cand = candidates[0]
+        parts = (cand.get("content") or {}).get("parts") or []
+        reply = "".join(p.get("text", "") for p in parts).strip()
+        if not reply:
+            return self._send(502, {"error": "Empty reply (finishReason: " + str(cand.get("finishReason")) + ")."})
+
+        return self._send(200, {"reply": reply})
