@@ -17,7 +17,7 @@ import urllib.error
 from http.server import BaseHTTPRequestHandler
 
 MODEL = "gemini-2.5-flash"          # stable; avoids preview-model deprecation
-MAX_OUTPUT_TOKENS = 1024
+MAX_OUTPUT_TOKENS = 2048
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
@@ -83,6 +83,9 @@ class handler(BaseHTTPRequestHandler):
                 # Gemini 2.5 "thinks" by default and can spend the whole output
                 # budget on it, returning an empty reply. Turn it off here.
                 "thinkingConfig": {"thinkingBudget": 0},
+                # The frontend uses an agentic plan protocol and expects the
+                # reply to be a JSON object {"actions":[...],"reply":"..."}.
+                "responseMimeType": "application/json",
             },
         }
         system = str(req.get("system") or req.get("systemPrompt") or "")
